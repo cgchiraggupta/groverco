@@ -20,7 +20,7 @@ Reviewed the supplied Business Planning Notes.docx and both JPGs in logo/. Origi
 - Software & technology: separate practice, limited to the user-confirmed software-engineering/website direction. No invented stack, packages, app specialisms or results.
 - About: user supplied that Nishant is pursuing CA and the other contributor is a software engineer. No qualified-CA title is used.
 - Main wordmark “Grover & Co” is a provisional text treatment inferred from the folder/repository; no main-brand logo was supplied. The supplied creative logo says “Works by Nish”; headings follow the user's “Work by Nish”. Confirm final naming before launch.
-- No bios, client names, portfolio examples, testimonials, contact details, pricing, GST/invoicing claims or performance promises were invented. Unclear source lines and private budget/schedule notes were not published.
+- No bios, client names, portfolio examples, testimonials, contact details, pricing, GST/invoicing claims or performance promises were invented. Unclear source lines and private budget/schedule notes were not published. A practice index is used as the hero visual because no project photography/portfolio examples were supplied; the two logo assets are aligned to their own practices.
 - No original handwritten references, additional brand document, portfolio, reference website URLs or photographs were present in the supplied project. The notes refer to originals not included. They remain content gaps.
 
 ## Enquiries
