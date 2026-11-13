@@ -95,7 +95,7 @@
       <div class="form-grid"><label>Full name <span>*</span><input name="name" autocomplete="name" required maxlength="120"></label><label>Phone number <span>*</span><input name="phone" type="tel" autocomplete="tel" required maxlength="30"></label><label>Email address <span>*</span><input name="email" type="email" autocomplete="email" required maxlength="254"></label><label>Business or brand name <input name="business" autocomplete="organization" maxlength="150"></label><label>Industry <input name="industry" maxlength="120" placeholder="For example, hospitality or technology"></label><label>Preferred way to connect <select name="contactPreference"><option>Phone</option><option>Email</option><option>Either</option></select></label></div>
       <label class="details-label" for="enquiry-details" id="details-label">Tell us about your requirements <span>*</span></label><textarea id="enquiry-details" name="details" rows="4" required minlength="10" maxlength="3000"></textarea>
       <p class="form-help">Please share only the details needed to discuss your enquiry. Do not include sensitive financial or identity information.</p>
-      <p class="form-notice">Your details will be sent to Grover &amp; Co. through FormSubmit so we can respond to your enquiry.</p>
+      <label class="consent service-consent"><input type="checkbox" name="Contact consent" value="Yes" required> I agree to be contacted about this enquiry. <span>*</span></label><p class="form-notice">Your details will be stored for Grover &amp; Co. and may also be forwarded through FormSubmit so we can respond.</p><p class="submit-status" role="status"></p>
       <button class="button" type="submit">Send enquiry <span>↗</span></button>
     </form>
   </dialog>
@@ -106,7 +106,7 @@
       <div class="form-grid" id="intake-fields"></div>
       <p class="form-help" id="intake-help"></p>
       <label class="consent"><input type="checkbox" name="Contact consent" value="Yes" required> I agree to be contacted about this request. <span>*</span></label>
-      <p class="form-notice">Your details will be sent to Grover &amp; Co. through FormSubmit.</p>
+      <p class="form-notice">Your details will be stored for Grover &amp; Co. and may also be forwarded through FormSubmit.</p><p class="submit-status" role="status"></p>
       <button class="button" type="submit">Submit details <span>↗</span></button>
     </form>
   </dialog>

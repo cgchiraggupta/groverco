@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+.DS_Store
+Business Planning Notes.docx
+logo/
+test-results/
+.git/
+.vercel/

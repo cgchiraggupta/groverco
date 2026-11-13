@@ -52,6 +52,8 @@ const prompts = [
 ];
 function openEnquiry(practice, title, prompt) {
   enquiryForm.reset();
+  enquiryForm.querySelector('[type=submit]').disabled = false;
+  enquiryForm.querySelector('.submit-status').textContent = '';
   enquiryService.textContent = `${practice} / ${title}`;
   document.querySelector('#enquiry-practice').value = practice;
   document.querySelector('#enquiry-selected-service').value = title;
@@ -122,6 +124,8 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
   const kind = button.dataset.intake;
   const config = intakeConfigs[kind];
   intakeForm.reset(); intakeFields.replaceChildren();
+  intakeForm.querySelector('[type=submit]').disabled = false;
+  intakeForm.querySelector('.submit-status').textContent = '';
   document.querySelector('#intake-title').textContent = config.title;
   document.querySelector('#intake-description').textContent = config.description;
   document.querySelector('#intake-help').textContent = config.help;
@@ -151,3 +155,37 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
   intakeDialog.showModal();
 }));
 document.querySelector('.intake-close').addEventListener('click', () => intakeDialog.close());
+
+// Store first; email forwarding is best-effort and never masks a saved enquiry.
+for (const form of [enquiryForm, intakeForm]) {
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const values = new FormData(form);
+    const kind = form === enquiryForm ? 'service' : values.get('Form type');
+    const details = {};
+    const commonFields = new Set(['name', 'phone', 'email', 'Name', 'Phone', 'Email', 'Form type', 'Business practice', 'Service', 'Contact consent', '_subject', '_template']);
+    for (const [key, value] of values.entries()) if (!commonFields.has(key) && typeof value === 'string') details[key] = value;
+    const payload = {
+      kind, name: values.get('name') || values.get('Name'), phone: values.get('phone') || values.get('Phone'),
+      email: values.get('email') || values.get('Email') || '', consent: values.get('Contact consent') === 'Yes',
+      practice: values.get('Business practice') || '', service: values.get('Service') || '', details
+    };
+    const button = form.querySelector('[type="submit"]'), feedback = form.querySelector('.submit-status');
+    button.disabled = true; feedback.textContent = 'Submitting your details…';
+    try {
+      const response = await fetch('/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || 'Could not submit. Please try again.'); }
+      // Email forwarding is independent of database storage. FormSubmit can
+      // require recipient activation, so never promise that email was delivered.
+      const emailPayload = Object.fromEntries([...values.entries()].filter(([, value]) => typeof value === 'string'));
+      fetch('https://formsubmit.co/ajax/worksbynish@gmail.com', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(emailPayload)
+      }).catch(() => {});
+      feedback.textContent = 'Thank you. Your details have been saved.';
+    } catch (error) {
+      feedback.textContent = error.message || 'Could not submit. Please try again.';
+      button.disabled = false;
+    }
+  });
+}

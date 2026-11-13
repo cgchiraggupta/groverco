@@ -13,7 +13,7 @@ Vercel can build the site with `npm run build` and serve the `dist` directory. C
 
 ## Enquiries and resources
 
-Service, creator, business and free-resource interest forms submit to FormSubmit for delivery to the configured email address. The recipient must activate the FormSubmit email link and verify delivery before relying on the forms. The forms collect personal details and disclose FormSubmit as the processor. There is no application database or automatic matching between creators and businesses.
+Service, creator, business and free-resource interest forms are saved in a private Supabase table and forwarded to FormSubmit for email delivery on a best-effort basis. The recipient must activate the FormSubmit email link and verify email delivery separately. The administrator can sign in at `/admin/` to review entries and compare creator profiles to business requests. Matching suggestions use exact matches on selected fields and require manual review; they do not contact people automatically. See `docs/backend-setup.md` for deployment and security configuration.
 
 Free resource materials have not yet been supplied. The resource form registers interest and does not provide a download. Contact-directory details are placeholders.
 
