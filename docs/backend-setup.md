@@ -4,6 +4,6 @@ The Vercel project needs `SUPABASE_URL`, `SUPABASE_ANON_KEY` (Supabase publishab
 
 Apply the SQL files in `supabase/migrations/` in order to create the private submissions and rate-limit tables. All browser roles are denied direct table access; the API uses the server-only secret. The admin API checks the Supabase session and the confirmed administrator email before reading submissions.
 
-The website saves form entries to Supabase and then attempts FormSubmit email delivery in the background. FormSubmit must be activated separately for the destination email, and email delivery must be tested independently of database storage. The free resources form records interest; actual resources are not yet available.
+The website saves form entries to Supabase and then attempts FormSubmit email delivery in the background. FormSubmit sends to worksbynish@gmail.com and copies chiraggupta0999@gmail.com. The primary recipient must activate FormSubmit, and email delivery must be tested independently of database storage. The free resources form records interest; actual resources are not yet available.
 
 Run `npm test` and `npm run build`. The rate limiter uses Vercel's `x-vercel-forwarded-for` header, so form submissions require a Vercel environment for end-to-end testing. Preview origins require their deployment's `VERCEL_URL` and suitable Supabase environment configuration.
