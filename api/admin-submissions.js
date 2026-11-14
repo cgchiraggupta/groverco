@@ -1,21 +1,56 @@
+const statuses = new Set(['new', 'reviewing', 'contacted', 'closed']);
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function authorize(req, res, env) {
+  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: publicKey, SUPABASE_SERVICE_ROLE_KEY: secret, ADMIN_EMAIL: allowed } = env;
+  if (!url || !publicKey || !secret || !allowed) { res.status(503).json({ error: 'Admin access is not configured.' }); return null; }
+  const match = /^Bearer ([A-Za-z0-9._-]+)$/.exec(req.headers.authorization || '');
+  if (!match) { res.status(401).json({ error: 'Sign in required.' }); return null; }
+  const base = url.replace(/\/$/, '');
+  try {
+    const response = await fetch(`${base}/auth/v1/user`, {
+      headers: { apikey: publicKey, Authorization: `Bearer ${match[1]}` }, signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) { res.status(401).json({ error: 'Session expired. Please sign in again.' }); return null; }
+    const user = await response.json();
+    if (!user.email_confirmed_at || typeof user.email !== 'string' || user.email.toLowerCase() !== allowed.toLowerCase()) {
+      res.status(403).json({ error: 'This account does not have admin access.' }); return null;
+    }
+    return { base, secret };
+  } catch {
+    res.status(502).json({ error: 'Could not verify admin access.' }); return null;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
-  const { SUPABASE_URL: url, SUPABASE_ANON_KEY: publicKey, SUPABASE_SERVICE_ROLE_KEY: secret, ADMIN_EMAIL: allowed } = process.env;
-  if (!url || !publicKey || !secret || !allowed) return res.status(503).json({ error: 'Admin access is not configured.' });
-  const match = /^Bearer ([A-Za-z0-9._-]+)$/.exec(req.headers.authorization || '');
-  if (!match) return res.status(401).json({ error: 'Sign in required.' });
-  const base = url.replace(/\/$/, '');
+  if (!['GET', 'PATCH', 'DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed.' });
+  if (['PATCH', 'DELETE'].includes(req.method) && !req.headers['content-type']?.toLowerCase().startsWith('application/json')) {
+    return res.status(415).json({ error: 'Expected JSON.' });
+  }
+  const credentials = await authorize(req, res, process.env);
+  if (!credentials) return;
+  const { base, secret } = credentials;
+  const headers = { apikey: secret, 'Content-Type': 'application/json', Prefer: 'return=representation' };
   try {
-    const authResponse = await fetch(`${base}/auth/v1/user`, { headers: { apikey: publicKey, Authorization: `Bearer ${match[1]}` }, signal: AbortSignal.timeout(10000) });
-    if (!authResponse.ok) return res.status(401).json({ error: 'Session expired. Please sign in again.' });
-    const user = await authResponse.json();
-    if (!user.email_confirmed_at || typeof user.email !== 'string' || user.email.toLowerCase() !== allowed.toLowerCase()) return res.status(403).json({ error: 'This account does not have admin access.' });
-    const dataResponse = await fetch(`${base}/rest/v1/grover_submissions?select=*&order=created_at.desc&limit=500`, { headers: { apikey: secret }, signal: AbortSignal.timeout(10000) });
-    if (!dataResponse.ok) return res.status(502).json({ error: 'Could not load submissions.' });
-    return res.status(200).json({ submissions: await dataResponse.json() });
+    if (req.method === 'GET') {
+      const response = await fetch(`${base}/rest/v1/grover_submissions?select=*&order=created_at.desc&limit=500`, { headers: { apikey: secret }, signal: AbortSignal.timeout(10000) });
+      if (!response.ok) return res.status(502).json({ error: 'Could not load submissions.' });
+      return res.status(200).json({ submissions: await response.json() });
+    }
+    const id = typeof req.body?.id === 'string' && uuid.test(req.body.id) ? req.body.id : null;
+    if (!id) return res.status(400).json({ error: 'A valid submission ID is required.' });
+    if (req.method === 'PATCH' && !statuses.has(req.body?.status)) return res.status(400).json({ error: 'Choose a valid status.' });
+    const endpoint = `${base}/rest/v1/grover_submissions?id=eq.${encodeURIComponent(id)}&select=id`;
+    const response = req.method === 'PATCH'
+      ? await fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ status: req.body.status }), signal: AbortSignal.timeout(10000) })
+      : await fetch(endpoint, { method: 'DELETE', headers, signal: AbortSignal.timeout(10000) });
+    if (!response.ok) return res.status(502).json({ error: req.method === 'PATCH' ? 'Could not update this submission.' : 'Could not delete this submission.' });
+    const changed = await response.json();
+    if (!changed.length) return res.status(404).json({ error: 'Submission not found.' });
+    return res.status(200).json({ ok: true });
   } catch {
-    return res.status(502).json({ error: 'Could not load submissions.' });
+    return res.status(502).json({ error: 'Could not update the dashboard.' });
   }
 }

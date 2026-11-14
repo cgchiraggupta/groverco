@@ -3,13 +3,19 @@ import assert from 'node:assert/strict';
 import { validateSubmission } from '../lib/submissions.js';
 import handler from '../api/submissions.js';
 
-const resource = { kind: 'resources', name: 'Jane', phone: '1234567890', consent: true, details: {} };
+const resource = { kind: 'resources', name: 'Jane', phone: '1234567890', consent: true, details: { 'Resource requested': 'Business Readiness Checklist' } };
 test('validates consent and rejects malformed or overlong input', () => {
   assert.ok(validateSubmission(resource).data);
   assert.ok(validateSubmission({ ...resource, consent: false }).error);
   assert.ok(validateSubmission({ ...resource, name: 'x'.repeat(121) }).error);
   assert.ok(validateSubmission({ ...resource, kind: 'admin' }).error);
   assert.ok(validateSubmission({ ...resource, kind: 'creator', email: 'a@b.com' }).error);
+});
+test('requires a selected free guide and keeps match sharing opt-in', () => {
+  assert.ok(validateSubmission({ ...resource, details: {} }).error);
+  const creator = { kind: 'creator', name: 'Asha', phone: '1234567890', email: 'asha@example.com', consent: true, matchingConsent: true, details: { 'Creator / brand name': 'Asha', 'Profile links': 'https://example.com', 'Category / niche': 'Food', Platform: 'Instagram', Location: 'Delhi', Audience: 'Local food fans', 'Content format': 'Reels' } };
+  assert.equal(validateSubmission(creator).data.matching_consent, true);
+  assert.equal(validateSubmission({ ...creator, matchingConsent: false }).data.matching_consent, false);
 });
 test('retains only fields appropriate for the form', () => {
   const result = validateSubmission({ ...resource, kind: 'service', email: 'a@example.com', practice: 'Works by Nish', service: 'Script Writing', details: { details: 'A short campaign', status: 'closed' } });

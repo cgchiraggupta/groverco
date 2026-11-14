@@ -13,8 +13,8 @@ Vercel can build the site with `npm run build` and serve the `dist` directory. C
 
 ## Enquiries and resources
 
-Service, creator, business and free-resource interest forms are saved in a private Supabase table and forwarded to FormSubmit for email delivery on a best-effort basis. The recipient must activate the FormSubmit email link and verify email delivery separately. The administrator can sign in at `/admin/` to review entries and compare creator profiles to business requests. Matching suggestions use exact matches on selected fields and require manual review; they do not contact people automatically. See `docs/backend-setup.md` for deployment and security configuration.
+Service, creator, business and free-resource forms are saved in a private Supabase table and forwarded to both configured inboxes through FormSubmit. The administrator can sign in at `/admin/` to review entries, update follow-up status, delete test or obsolete records, compare opted-in creator profiles with opted-in business requests, and prepare an unsent introduction email draft. The admin reviews every match and sends any introduction manually. See `/privacy.html` for the data notice and `docs/end-to-end-test.md` for a complete test walkthrough.
 
-Free resource materials have not yet been supplied. The resource form registers interest and does not provide a download. Contact-directory details are placeholders.
+Two practical starter guides are available after the free-resource form is submitted. The contact-directory details remain placeholders until the business provides them.
 
 Original source notes and logo files are excluded from Git. Optimized logo assets used by the site are included in `assets/`.

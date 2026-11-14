@@ -97,7 +97,7 @@ const sharedFields = [
   { name: 'Timeline / availability', creator: 'Availability', business: 'Campaign timeline', placeholder: 'e.g. dates or timeframe' }
 ];
 const intakeConfigs = {
-  resources: { title: 'Access free resources.', description: 'Register your interest in our upcoming free booklets and practical guides.', help: 'Resources are coming soon. Submitting this form registers your interest; no download is available yet.' },
+  resources: { title: 'Access free resources.', description: 'Choose a free, practical checklist and unlock it after you submit your details.', help: 'Your guide opens as soon as your details are saved. It is general information, not legal, tax or financial advice.' },
   creator: { title: 'Join as a creator.', description: 'Tell us about your work so we can consider you for relevant brand collaborations.', help: 'Please share information you are comfortable providing. A submission does not guarantee a collaboration.' },
   business: { title: 'Find your creator fit.', description: 'Tell us about your brand and the creator collaboration you have in mind.', help: 'Your answers use the same categories as the creator form to make future matching easier.' }
 };
@@ -126,6 +126,7 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
   intakeForm.reset(); intakeFields.replaceChildren();
   intakeForm.querySelector('[type=submit]').disabled = false;
   intakeForm.querySelector('.submit-status').textContent = '';
+  intakeForm.querySelector('.resource-download').hidden = true;
   document.querySelector('#intake-title').textContent = config.title;
   document.querySelector('#intake-description').textContent = config.description;
   document.querySelector('#intake-help').textContent = config.help;
@@ -135,6 +136,12 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
     { name: 'Name', label: 'Full name', autocomplete: 'name', required: true },
     { name: 'Phone', label: 'Phone number', type: 'tel', autocomplete: 'tel', required: true }
   ];
+  let sharing;
+  if (kind === 'resources') fields.push({
+    name: 'Resource requested', label: 'Choose a free guide', options: [
+      'Business Readiness Checklist', 'Creator Collaboration Readiness Checklist'
+    ], required: true
+  });
   if (kind !== 'resources') {
     fields.push({ name: 'Email', label: 'Email address', type: 'email', autocomplete: 'email', required: true });
     if (kind === 'creator') fields.push(
@@ -150,8 +157,14 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
       { name: 'Campaign goal', label: 'Campaign goal', placeholder: 'e.g. awareness, content, launches', required: true }
     );
     fields.push(...sharedFields, { name: 'Additional details', label: 'Anything else we should know?', multiline: true });
+    sharing = document.createElement('label');
+    sharing.className = 'consent matching-consent';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox'; checkbox.name = 'Match sharing consent'; checkbox.value = 'Yes';
+    sharing.append(checkbox, document.createTextNode(' I agree that relevant details from this form may be shared with a suitable potential collaborator after Grover & Co. reviews a match. Contact details are shared only in a reviewed introduction.'));
   }
   fields.forEach(field => addIntakeField(field, kind));
+  if (sharing) intakeFields.append(sharing);
   intakeDialog.showModal();
 }));
 document.querySelector('.intake-close').addEventListener('click', () => intakeDialog.close());
@@ -163,11 +176,12 @@ for (const form of [enquiryForm, intakeForm]) {
     const values = new FormData(form);
     const kind = form === enquiryForm ? 'service' : values.get('Form type');
     const details = {};
-    const commonFields = new Set(['name', 'phone', 'email', 'Name', 'Phone', 'Email', 'Form type', 'Business practice', 'Service', 'Contact consent', '_subject', '_template']);
+    const commonFields = new Set(['name', 'phone', 'email', 'Name', 'Phone', 'Email', 'Form type', 'Business practice', 'Service', 'Contact consent', 'Match sharing consent', '_subject', '_template']);
     for (const [key, value] of values.entries()) if (!commonFields.has(key) && typeof value === 'string') details[key] = value;
     const payload = {
       kind, name: values.get('name') || values.get('Name'), phone: values.get('phone') || values.get('Phone'),
       email: values.get('email') || values.get('Email') || '', consent: values.get('Contact consent') === 'Yes',
+      matchingConsent: values.get('Match sharing consent') === 'Yes',
       practice: values.get('Business practice') || '', service: values.get('Service') || '', details
     };
     const button = form.querySelector('[type="submit"]'), feedback = form.querySelector('.submit-status');
@@ -179,11 +193,28 @@ for (const form of [enquiryForm, intakeForm]) {
       // require recipient activation, so never promise that email was delivered.
       const emailPayload = Object.fromEntries([...values.entries()].filter(([, value]) => typeof value === 'string'));
       emailPayload._cc = 'chiraggupta0999@gmail.com';
-      fetch('https://formsubmit.co/ajax/worksbynish@gmail.com', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(emailPayload)
-      }).catch(() => {});
-      feedback.textContent = 'Thank you. Your details have been saved.';
+      let emailDelivered = false;
+      try {
+        const emailResponse = await fetch('https://formsubmit.co/ajax/worksbynish@gmail.com', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(emailPayload), signal: AbortSignal.timeout(12000)
+        });
+        const emailResult = await emailResponse.json().catch(() => ({}));
+        emailDelivered = emailResponse.ok && emailResult.success !== false && emailResult.success !== 'false';
+      } catch { /* the saved enquiry remains available in the private dashboard */ }
+      feedback.textContent = emailDelivered
+        ? 'Thank you. Your details were saved and email alerts were sent.'
+        : 'Your details were saved. Email forwarding could not be confirmed; the enquiry is available in the private dashboard.';
+      if (kind === 'resources') {
+        const selected = values.get('Resource requested');
+        const resourceLink = form.querySelector('.resource-download');
+        const resourceFiles = {
+          'Business Readiness Checklist': '/resources/business-readiness.html',
+          'Creator Collaboration Readiness Checklist': '/resources/creator-readiness.html'
+        };
+        resourceLink.href = resourceFiles[selected] || '/resources/';
+        resourceLink.hidden = false;
+      }
     } catch (error) {
       feedback.textContent = error.message || 'Could not submit. Please try again.';
       button.disabled = false;
