@@ -28,6 +28,24 @@ const enquiryForm = document.querySelector('#enquiry-form');
 const enquiryService = document.querySelector('#enquiry-service');
 const detailsLabel = document.querySelector('#details-label');
 const detailsField = document.querySelector('#enquiry-details');
+const defaultLeadSources = ['Website', 'Instagram', 'LinkedIn', 'Google', 'Referral', 'Event / Exhibition', 'WhatsApp', 'Other'];
+async function getLeadSources() {
+  try {
+    const response = await fetch('/api/public-sources', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Could not load configured lead sources.');
+    const data = await response.json();
+    return [...new Set(['Website', ...(data.sources || []).map(item => item.label).filter(Boolean)])];
+  } catch { return defaultLeadSources; }
+}
+async function populateLeadSources(select) {
+  const previous = select.value || 'Website';
+  const options = await getLeadSources();
+  select.replaceChildren();
+  for (const value of [...new Set([previous, ...options])]) {
+    const option = document.createElement('option'); option.value = value; option.textContent = value; select.append(option);
+  }
+  select.value = previous;
+}
 const prompts = [
   ['What GST registration or filing support do you need?', 'What is your business type and what support are you looking for?'],
   ['What working capital or financial management support do you need?', 'Briefly describe your business needs and goals.'],
@@ -60,6 +78,7 @@ function openEnquiry(practice, title, prompt) {
   document.querySelector('#enquiry-subject').value = `New enquiry: ${practice} — ${title}`;
   detailsLabel.firstChild.textContent = `${prompt[0]} `;
   detailsField.placeholder = prompt[1];
+  void populateLeadSources(document.querySelector('#enquiry-source'));
   dialog.showModal();
 }
 document.querySelectorAll('.service-card').forEach((card, index) => {
@@ -120,7 +139,7 @@ function addIntakeField(field, kind) {
   control.required = !!field.required;
   label.append(control); intakeFields.append(label);
 }
-document.querySelectorAll('[data-intake]').forEach(button => button.addEventListener('click', () => {
+document.querySelectorAll('[data-intake]').forEach(button => button.addEventListener('click', async () => {
   const kind = button.dataset.intake;
   const config = intakeConfigs[kind];
   intakeForm.reset(); intakeFields.replaceChildren();
@@ -136,6 +155,7 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
     { name: 'Name', label: 'Full name', autocomplete: 'name', required: true },
     { name: 'Phone', label: 'Phone number', type: 'tel', autocomplete: 'tel', required: true }
   ];
+  fields.push({ name: 'Lead source', label: 'How did you hear about us?', options: await getLeadSources() });
   let sharing;
   if (kind === 'resources') fields.push({
     name: 'Resource requested', label: 'Choose a free guide', options: [
@@ -176,12 +196,13 @@ for (const form of [enquiryForm, intakeForm]) {
     const values = new FormData(form);
     const kind = form === enquiryForm ? 'service' : values.get('Form type');
     const details = {};
-    const commonFields = new Set(['name', 'phone', 'email', 'Name', 'Phone', 'Email', 'Form type', 'Business practice', 'Service', 'Contact consent', 'Match sharing consent', '_subject', '_template']);
+    const commonFields = new Set(['name', 'phone', 'email', 'Name', 'Phone', 'Email', 'Lead source', 'Form type', 'Business practice', 'Service', 'Contact consent', 'Match sharing consent', '_subject', '_template']);
     for (const [key, value] of values.entries()) if (!commonFields.has(key) && typeof value === 'string') details[key] = value;
     const payload = {
       kind, name: values.get('name') || values.get('Name'), phone: values.get('phone') || values.get('Phone'),
       email: values.get('email') || values.get('Email') || '', consent: values.get('Contact consent') === 'Yes',
       matchingConsent: values.get('Match sharing consent') === 'Yes',
+      source: values.get('Lead source') || 'Website',
       practice: values.get('Business practice') || '', service: values.get('Service') || '', details
     };
     const button = form.querySelector('[type="submit"]'), feedback = form.querySelector('.submit-status');

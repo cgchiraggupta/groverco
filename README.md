@@ -18,3 +18,6 @@ Service, creator, business and free-resource forms are saved in a private Supaba
 Two practical starter guides are available after the free-resource form is submitted. The contact-directory details remain placeholders until the business provides them.
 
 Original source notes and logo files are excluded from Git. Optimized logo assets used by the site are included in `assets/`.
+## Lead workspace
+
+The private admin page includes a lead summary, source reporting, per-lead source/status/marker/notes/follow-up controls, contact-attempt counts, and a sheet-ready CSV export. Lead sources can be added or paused in the CMS section; active sources are offered on new public enquiry forms. CSV exports cover the latest 500 records and can be imported into the Google Sheets tracker as a snapshot. The dashboard remains the live system of record.
