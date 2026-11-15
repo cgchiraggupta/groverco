@@ -139,7 +139,12 @@ function addIntakeField(field, kind) {
   control.required = !!field.required;
   label.append(control); intakeFields.append(label);
 }
+let intakeOpening = false;
 document.querySelectorAll('[data-intake]').forEach(button => button.addEventListener('click', async () => {
+  // The source list loads asynchronously. Ignore rapid repeat clicks so two
+  // openings cannot append the same set of generated fields concurrently.
+  if (intakeOpening || intakeDialog.open) return;
+  intakeOpening = true;
   const kind = button.dataset.intake;
   const config = intakeConfigs[kind];
   intakeForm.reset(); intakeFields.replaceChildren();
@@ -186,6 +191,7 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
   fields.forEach(field => addIntakeField(field, kind));
   if (sharing) intakeFields.append(sharing);
   intakeDialog.showModal();
+  intakeOpening = false;
 }));
 document.querySelector('.intake-close').addEventListener('click', () => intakeDialog.close());
 
