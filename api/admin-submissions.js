@@ -36,14 +36,20 @@ export default async function handler(req, res) {
   const headers = { apikey: secret, 'Content-Type': 'application/json', Prefer: 'return=representation' };
   try {
     if (req.method === 'GET') {
-      const response = await fetch(`${base}/rest/v1/grover_submissions?select=*&order=created_at.desc&limit=500`, { headers: { apikey: secret }, signal: AbortSignal.timeout(10000) });
+      const includeArchived = ['true', '1'].includes(String(req.query?.include_archived || '').toLowerCase());
+      const archiveFilter = includeArchived ? '' : '&archived_at=is.null';
+      const response = await fetch(`${base}/rest/v1/grover_submissions?select=*&order=created_at.desc&limit=500${archiveFilter}`, { headers: { apikey: secret }, signal: AbortSignal.timeout(10000) });
       if (!response.ok) return res.status(502).json({ error: 'Could not load submissions.' });
       return res.status(200).json({ submissions: await response.json() });
     }
     const id = typeof req.body?.id === 'string' && uuid.test(req.body.id) ? req.body.id : null;
     if (!id) return res.status(400).json({ error: 'A valid submission ID is required.' });
     if (req.method === 'PATCH') {
-      if (req.body?.mark_contacted === true) {
+      const archiveAction = req.body?.archive === true || req.body?.restore === true;
+      if (archiveAction) {
+        if (req.body.archive === true && req.body.restore === true) return res.status(400).json({ error: 'Choose archive or restore.' });
+        req.crmPatch = { archived_at: req.body.archive === true ? new Date().toISOString() : null };
+      } else if (req.body?.mark_contacted === true) {
         req.crmAction = 'mark_contacted';
       } else {
       const patch = {};

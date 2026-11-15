@@ -10,7 +10,9 @@
 
 ## Google Sheets snapshot
 
-The admin export downloads the latest 500 records as a CSV with the same tracking columns as the Google Sheets workbook. In Google Sheets, use **File → Import → Upload**, import as a new tab, then copy the data rows (without the CSV header) into the **Leads** tab starting at A2. This is a manual snapshot export; the admin dashboard is the live record and edits to the workbook do not write back to the website.
+The admin export downloads active records from the latest 500 submissions as a CSV with the same tracking columns as the Google Sheets workbook. In Google Sheets, use **File → Import → Upload**, import as a new tab, then copy the data rows (without the CSV header) into the **Leads** tab starting at A2. This is a manual snapshot export; the admin dashboard is the live record and edits to the workbook do not write back to the website.
+
+Use **Archive lead** to remove a test or irrelevant enquiry from active totals without deleting its record. Enable **Include archived** to review archived submissions and restore one if needed. Archived records do not count in lead source totals or creator/business matching, and are excluded from CSV exports.
 
 ## Source tracking
 

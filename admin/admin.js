@@ -8,7 +8,8 @@ const status = document.querySelector('#dashboard-status');
 const signOut = document.querySelector('#sign-out');
 const submissionsNode = document.querySelector('#submissions');
 const sourceList = document.querySelector('#source-list');
-let client, submissions = [], sources = [];
+let client, submissions = [], sources = [], includeArchived = false;
+const activeSubmissions = () => submissions.filter(item => !item.archived_at);
 
 function prepareIntroduction(business, creator) {
   const bd = business.details || {}, cd = creator.details || {};
@@ -32,13 +33,14 @@ async function currentSession() {
 }
 
 function renderSummary() {
-  const total = submissions.length;
-  const contacted = submissions.filter(item => item.status === 'contacted' || Number(item.contact_count) > 0).length;
-  const newLeads = submissions.filter(item => !item.status || item.status === 'new').length;
-  const urgent = submissions.filter(item => item.marker === 'red').length;
+  const active = activeSubmissions();
+  const total = active.length;
+  const contacted = active.filter(item => item.status === 'contacted' || Number(item.contact_count) > 0).length;
+  const newLeads = active.filter(item => !item.status || item.status === 'new').length;
+  const urgent = active.filter(item => item.marker === 'red').length;
   const today = new Date().toISOString().slice(0, 10);
-  const due = submissions.filter(item => item.follow_up_at && item.follow_up_at <= today && item.status !== 'closed').length;
-  const totalTouches = submissions.reduce((sum, item) => sum + Number(item.contact_count || 0), 0);
+  const due = active.filter(item => item.follow_up_at && item.follow_up_at <= today && item.status !== 'closed').length;
+  const totalTouches = active.reduce((sum, item) => sum + Number(item.contact_count || 0), 0);
   const stats = [['All leads', total], ['New', newLeads], ['Contacted leads', contacted], ['Contact attempts', totalTouches], ['Urgent · red', urgent], ['Follow-ups due', due]];
   const root = document.querySelector('#crm-summary'); root.replaceChildren();
   for (const [label, value] of stats) {
@@ -48,7 +50,7 @@ function renderSummary() {
     card.append(count, name); root.append(card);
   }
   const totals = new Map();
-  for (const item of submissions) { const source = item.source || 'Website'; totals.set(source, (totals.get(source) || 0) + 1); }
+  for (const item of active) { const source = item.source || 'Website'; totals.set(source, (totals.get(source) || 0) + 1); }
   const sourceReport = document.createElement('section'); sourceReport.className = 'source-report';
   const heading = document.createElement('h2'); heading.textContent = 'Leads by source'; sourceReport.append(heading);
   if (!totals.size) { const empty = document.createElement('p'); empty.textContent = 'Your lead sources will appear here as enquiries arrive.'; sourceReport.append(empty); }
@@ -64,13 +66,13 @@ function renderSummary() {
 function renderMatches() {
   const select = document.querySelector('#match-business'), previous = select.value;
   select.replaceChildren(new Option('Select a business request', ''));
-  for (const item of submissions.filter(item => item.kind === 'business')) select.add(new Option(`${item.details?.['Business name'] || item.name}${item.matching_consent ? '' : ' — matching not enabled'}`, item.id));
+  for (const item of activeSubmissions().filter(item => item.kind === 'business')) select.add(new Option(`${item.details?.['Business name'] || item.name}${item.matching_consent ? '' : ' — matching not enabled'}`, item.id));
   select.value = previous;
   const container = document.querySelector('#match-results'); container.replaceChildren();
   const business = submissions.find(item => item.id === select.value && item.kind === 'business');
   if (!business) return;
   if (!business.matching_consent) { const note = document.createElement('p'); note.textContent = 'This business has not opted into match sharing, so its brief is excluded from creator suggestions.'; container.append(note); return; }
-  const results = matchCreators(business, submissions.filter(item => item.kind === 'creator' && item.matching_consent === true));
+  const results = matchCreators(business, activeSubmissions().filter(item => item.kind === 'creator' && item.matching_consent === true));
   const note = document.createElement('p'); note.textContent = 'Exact matches use platform, niche, location and content format. Introduction links create an unsent email draft.'; container.append(note);
   if (!results.length) { const empty = document.createElement('p'); empty.textContent = 'No opted-in creator profiles match this business yet.'; container.append(empty); return; }
   const candidates = document.createElement('div'); candidates.className = 'match-candidates';
@@ -113,13 +115,15 @@ function addControlLabel(parent, text, control) {
 }
 
 function renderSubmission(item) {
-  const card = document.createElement('article'); card.className = `submission marker-${item.marker || 'none'}`;
+  const archived = !!item.archived_at;
+  const card = document.createElement('article'); card.className = `submission marker-${item.marker || 'none'}${archived ? ' is-archived' : ''}`;
   const meta = document.createElement('p'); meta.className = 'meta'; meta.textContent = `${item.kind} · ${new Date(item.created_at).toLocaleString()}`;
   const title = document.createElement('h2'); title.textContent = item.name;
   const chips = document.createElement('div'); chips.className = 'lead-chips';
   const sourceChip = document.createElement('span'); sourceChip.className = 'lead-chip'; sourceChip.textContent = `Source: ${item.source || 'Website'}`;
   const markerChip = document.createElement('span'); markerChip.className = `lead-chip marker-chip ${item.marker || 'none'}`; markerChip.textContent = item.marker === 'red' ? 'Urgent' : item.marker === 'blue' ? 'Follow up' : 'Standard';
   chips.append(sourceChip, markerChip);
+  if (archived) { const archivedChip = document.createElement('span'); archivedChip.className = 'lead-chip archived-chip'; archivedChip.textContent = `Archived ${new Date(item.archived_at).toLocaleDateString()}`; chips.append(archivedChip); }
   const dl = document.createElement('dl');
   for (const [key, value] of Object.entries({ Phone: item.phone, Email: item.email, Practice: item.practice, Service: item.service, 'Match sharing opted in': item.matching_consent ? 'Yes' : 'No', ...item.details })) {
     if (value == null || value === '') continue;
@@ -139,6 +143,13 @@ function renderSubmission(item) {
   state.value = item.status || 'new'; addControlLabel(controls, 'Lead status', state);
   const notes = document.createElement('textarea'); notes.maxLength = 3000; notes.value = item.notes || ''; notes.placeholder = 'Call outcome, decision maker, next step…'; notes.setAttribute('aria-label', `Notes for ${item.name}`); addControlLabel(controls, 'Internal notes', notes);
   const actions = document.createElement('div'); actions.className = 'lead-actions';
+  const archive = document.createElement('button'); archive.className = `admin-link${archived ? '' : ' archive-action'}`; archive.type = 'button'; archive.textContent = archived ? 'Restore lead' : 'Archive lead';
+  archive.addEventListener('click', async () => {
+    archive.disabled = true;
+    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, ...(archived ? { restore: true } : { archive: true }) }); status.textContent = archived ? `Lead restored for ${item.name}.` : `Lead archived for ${item.name}.`; await load(session); }
+    catch (error) { status.textContent = error.message; archive.disabled = false; }
+  });
+  if (archived) { actions.append(archive); card.append(meta, title, chips, dl, actions); return card; }
   const save = document.createElement('button'); save.className = 'admin-link'; save.type = 'button'; save.textContent = 'Save lead details';
   save.addEventListener('click', async () => {
     save.disabled = true;
@@ -152,7 +163,7 @@ function renderSubmission(item) {
     catch (error) { status.textContent = error.message; contacted.disabled = false; }
   });
   const last = document.createElement('p'); last.className = 'last-contacted'; last.textContent = item.last_contacted_at ? `Last contacted ${new Date(item.last_contacted_at).toLocaleString()}` : 'No contact attempt recorded yet';
-  actions.append(save, contacted, last); card.append(meta, title, chips, dl, controls, actions); return card;
+  actions.append(save, contacted, archive, last); card.append(meta, title, chips, dl, controls, actions); return card;
 }
 
 function render() {
@@ -160,7 +171,7 @@ function render() {
   const kind = document.querySelector('#kind-filter').value;
   const query = document.querySelector('#search').value.trim().toLowerCase();
   submissionsNode.replaceChildren();
-  const shown = submissions.filter(item => (kind === 'all' || item.kind === kind) && (!query || JSON.stringify(item).toLowerCase().includes(query)));
+  const shown = submissions.filter(item => (includeArchived || !item.archived_at) && (kind === 'all' || item.kind === kind) && (!query || JSON.stringify(item).toLowerCase().includes(query)));
   status.textContent = `${shown.length} lead${shown.length === 1 ? '' : 's'} shown`;
   for (const item of shown) submissionsNode.append(renderSubmission(item));
 }
@@ -172,15 +183,16 @@ function csvCell(value) {
 }
 function exportCsv() {
   const columns = ['ID','Created at','Type','Name','Phone','Email','Lead source','Status','Marker','Contact attempts','Last contacted','Next follow-up','Business / brand','Service','Internal notes','Form details'];
-  const rows = [columns, ...submissions.map(item => [item.id,item.created_at,item.kind,item.name,item.phone,item.email,item.source || 'Website',item.status || 'new',item.marker || 'none',item.contact_count || 0,item.last_contacted_at,item.follow_up_at,item.practice || item.details?.['Business name'] || item.details?.business,item.service,item.notes,item.details])];
+  const rows = [columns, ...activeSubmissions().map(item => [item.id,item.created_at,item.kind,item.name,item.phone,item.email,item.source || 'Website',item.status || 'new',item.marker || 'none',item.contact_count || 0,item.last_contacted_at,item.follow_up_at,item.practice || item.details?.['Business name'] || item.details?.business,item.service,item.notes,item.details])];
   const csv = `\uFEFF${rows.map(row => row.map(csvCell).join(',')).join('\r\n')}`;
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a'); link.href = url; link.download = `grover-leads-${new Date().toISOString().slice(0,10)}.csv`; link.click(); URL.revokeObjectURL(url);
 }
 
 async function load(session) {
+  const archivedQuery = includeArchived ? '?include_archived=true' : '';
   const [leadResult, sourceResult] = await Promise.all([
-    adminRequest(session, '/api/admin-submissions'), adminRequest(session, '/api/admin-sources')
+    adminRequest(session, `/api/admin-submissions${archivedQuery}`), adminRequest(session, '/api/admin-sources')
   ]);
   submissions = leadResult.submissions; sources = sourceResult.sources; login.hidden = true; dashboard.hidden = false; signOut.hidden = false; render();
 }
@@ -208,6 +220,7 @@ signOut.addEventListener('click', async () => { await client.auth.signOut(); sub
 document.querySelector('#refresh').addEventListener('click', async () => { try { await load(await currentSession()); status.textContent = `Loaded ${submissions.length} leads and ${sources.length} sources.`; } catch (error) { status.textContent = error.message; } });
 document.querySelector('#export-csv').addEventListener('click', exportCsv);
 document.querySelector('#match-business').addEventListener('change', renderMatches);
+document.querySelector('#include-archived').addEventListener('change', async event => { includeArchived = event.currentTarget.checked; try { await load(await currentSession()); } catch (error) { status.textContent = error.message; } });
 ['#kind-filter','#search'].forEach(selector => document.querySelector(selector).addEventListener('input', render));
 document.querySelector('#source-form').addEventListener('submit', async event => {
   event.preventDefault(); const input = document.querySelector('#new-source-label'), label = input.value.trim(); if (!label) return;
