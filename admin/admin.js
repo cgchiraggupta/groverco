@@ -10,6 +10,7 @@ const loginForm = document.querySelector('#login-form');
 const passwordForm = document.querySelector('#password-form');
 const passwordStatus = document.querySelector('#password-status');
 const forgotPassword = document.querySelector('#forgot-password');
+const backToLogin = document.querySelector('#back-to-login');
 const status = document.querySelector('#dashboard-status');
 const signOut = document.querySelector('#sign-out');
 const submissionsNode = document.querySelector('#submissions');
@@ -288,6 +289,11 @@ forgotPassword.addEventListener('click', async () => {
   loginStatus.textContent = 'Sending a reset link…';
   const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/admin/` });
   loginStatus.textContent = error ? error.message : 'Password reset link sent. Check your inbox.';
+});
+backToLogin.addEventListener('click', () => {
+  passwordForm.hidden = true; loginForm.hidden = false; forgotPassword.hidden = false;
+  loginTitle.textContent = 'Welcome back.'; loginIntro.textContent = 'Sign in to manage leads, sources and follow-up.';
+  loginStatus.textContent = '';
 });
 signOut.addEventListener('click', async () => { await client.auth.signOut(); submissions = []; sources = []; submissionsNode.replaceChildren(); dashboard.hidden = true; signOut.hidden = true; login.hidden = false; });
 document.querySelector('#refresh').addEventListener('click', async () => { try { await load(await currentSession()); status.textContent = `Loaded ${submissions.length} leads and ${sources.length} sources.`; } catch (error) { status.textContent = error.message; } });
