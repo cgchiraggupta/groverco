@@ -14,7 +14,8 @@ async function authorize(req, res, env) {
     });
     if (!response.ok) { res.status(401).json({ error: 'Session expired. Please sign in again.' }); return null; }
     const user = await response.json();
-    if (!user.email_confirmed_at || typeof user.email !== 'string' || user.email.toLowerCase() !== allowed.toLowerCase()) {
+    const allowedEmails = new Set(String(allowed).split(',').map(value => value.trim().toLowerCase()).filter(Boolean));
+    if (!user.email_confirmed_at || typeof user.email !== 'string' || !allowedEmails.has(user.email.toLowerCase())) {
       res.status(403).json({ error: 'This account does not have admin access.' }); return null;
     }
     return { base, secret };

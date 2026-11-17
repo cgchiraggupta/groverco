@@ -116,10 +116,33 @@ const sharedFields = [
   { name: 'Timeline / availability', creator: 'Availability', business: 'Campaign timeline', placeholder: 'e.g. dates or timeframe' }
 ];
 const intakeConfigs = {
-  resources: { title: 'Access free resources.', description: 'Choose a free, practical checklist and unlock it after you submit your details.', help: 'Your guide opens as soon as your details are saved. It is general information, not legal, tax or financial advice.' },
+  resources: { title: 'Access free resources.', description: 'Choose a free, practical checklist and download it after you submit your details.', help: 'Your guide downloads as soon as your details are saved. It is general information, not legal, tax or financial advice.' },
   creator: { title: 'Join as a creator.', description: 'Tell us about your work so we can consider you for relevant brand collaborations.', help: 'Please share information you are comfortable providing. A submission does not guarantee a collaboration.' },
   business: { title: 'Find your creator fit.', description: 'Tell us about your brand and the creator collaboration you have in mind.', help: 'Your answers use the same categories as the creator form to make future matching easier.' }
 };
+const whatsappNumber = '918287980063';
+function resourceWhatsAppHref() {
+  const values = new FormData(intakeForm);
+  const name = String(values.get('Name') || '').trim();
+  const phone = String(values.get('Phone') || '').trim();
+  const guide = String(values.get('Resource requested') || '').trim();
+  const details = [];
+  if (name) details.push(`Name: ${name}`);
+  if (phone) details.push(`Phone: ${phone}`);
+  if (guide) details.push(`Guide I downloaded: ${guide}`);
+  const lines = ['Hi Nishant, I would like a custom resource made for my business.'];
+  if (details.length) lines.push('', ...details);
+  lines.push('', 'I found you through the Grover & Co. free resources page.');
+  return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
+function updateResourceWhatsApp() {
+  const section = document.querySelector('#resource-custom');
+  const link = document.querySelector('#resource-whatsapp');
+  if (!section || section.hidden || !link) return;
+  link.href = resourceWhatsAppHref();
+}
+intakeForm.addEventListener('input', updateResourceWhatsApp);
+intakeForm.addEventListener('change', updateResourceWhatsApp);
 function addIntakeField(field, kind) {
   const label = document.createElement('label');
   label.append(document.createTextNode((field[kind] || field.label || field.name) + (field.required ? ' *' : '')));
@@ -190,6 +213,8 @@ document.querySelectorAll('[data-intake]').forEach(button => button.addEventList
   }
   fields.forEach(field => addIntakeField(field, kind));
   if (sharing) intakeFields.append(sharing);
+  document.querySelector('#resource-custom').hidden = kind !== 'resources';
+  updateResourceWhatsApp();
   intakeDialog.showModal();
   intakeOpening = false;
 }));
@@ -236,11 +261,32 @@ for (const form of [enquiryForm, intakeForm]) {
         const selected = values.get('Resource requested');
         const resourceLink = form.querySelector('.resource-download');
         const resourceFiles = {
-          'Business Readiness Checklist': '/resources/business-readiness.html',
-          'Creator Collaboration Readiness Checklist': '/resources/creator-readiness.html'
+          'Business Readiness Checklist': { href: '/resources/downloads/grover-co-business-readiness-checklist.pdf', file: 'grover-co-business-readiness-checklist.pdf' },
+          'Creator Collaboration Readiness Checklist': { href: '/resources/downloads/grover-co-creator-collaboration-readiness-checklist.pdf', file: 'grover-co-creator-collaboration-readiness-checklist.pdf' }
         };
-        resourceLink.href = resourceFiles[selected] || '/resources/';
-        resourceLink.hidden = false;
+        const resource = resourceFiles[selected];
+        if (resource) {
+          resourceLink.href = resource.href;
+          resourceLink.download = resource.file;
+          resourceLink.textContent = 'Download your free guide again ↓';
+          resourceLink.hidden = false;
+          // Start the download only after the details have been saved.
+          const autoDownload = document.createElement('a');
+          autoDownload.href = resource.href;
+          autoDownload.download = resource.file;
+          autoDownload.hidden = true;
+          document.body.append(autoDownload);
+          autoDownload.click();
+          autoDownload.remove();
+          updateResourceWhatsApp();
+          feedback.textContent = 'Thank you. Your details were saved and your guide is downloading. Use the link below if it does not start.';
+        } else {
+          resourceLink.href = '/resources/';
+          resourceLink.removeAttribute('download');
+          resourceLink.textContent = 'Open the free guides ↗';
+          resourceLink.hidden = false;
+          feedback.textContent = 'Thank you. Your details were saved.';
+        }
       }
     } catch (error) {
       feedback.textContent = error.message || 'Could not submit. Please try again.';

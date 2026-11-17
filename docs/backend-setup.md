@@ -1,8 +1,10 @@
 # Backend setup
 
-The Vercel project needs `SUPABASE_URL`, `SUPABASE_ANON_KEY` (Supabase publishable key), `SUPABASE_SERVICE_ROLE_KEY` (Supabase secret key) and `ADMIN_EMAIL` set as server environment variables. Never commit or expose the secret key. Provision a confirmed Supabase Auth user for the administrator separately; passwords are managed by Supabase and do not belong in this repository.
+The Vercel project needs `SUPABASE_URL`, `SUPABASE_ANON_KEY` (Supabase publishable key), `SUPABASE_SERVICE_ROLE_KEY` (Supabase secret key) and `ADMIN_EMAIL` set as server environment variables. Never commit or expose the secret key. `ADMIN_EMAIL` accepts a comma-separated allowlist, for example `nishant@example.com,chirag@example.com`; every listed address must have its own confirmed Supabase Auth user. Provision those users separately; passwords are managed by Supabase and do not belong in this repository.
 
-Apply the SQL files in `supabase/migrations/` in order to create the private submissions and rate-limit tables. All browser roles are denied direct table access; the API uses the server-only secret. The admin API checks the Supabase session and the confirmed administrator email before reading submissions.
+Apply the SQL files in `supabase/migrations/` in order to create the private submissions and rate-limit tables. All browser roles are denied direct table access; the API uses the server-only secret. The admin API checks the Supabase session and the confirmed administrator emails before reading submissions or changing lead sources.
+
+The Google Sheet linked from the admin header is a separate Google Drive file. Sharing it is a Google Drive permission, not a website setting: open the sheet, choose **Share**, and add each administrator as an Editor (or transfer ownership if required). The website cannot change Google Drive permissions.
 
 The website saves form entries to Supabase and then attempts FormSubmit email delivery to worksbynish@gmail.com with chiraggupta0999@gmail.com copied. The recipient activation is complete and both inboxes have received a test. Form status is shown separately from database storage so an email failure does not hide a saved enquiry. The free-resource form unlocks the selected starter guide after saving the request.
 

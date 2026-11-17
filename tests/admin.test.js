@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import handler from '../api/admin-submissions.js';
+import sourcesHandler from '../api/admin-sources.js';
 const makeRes = () => ({ setHeader() {}, status(n) { this.code = n; return this; }, json(value) { this.body = value; return this; } });
 test('admin API rejects missing credentials and other users', async () => {
   const vars = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ADMIN_EMAIL'];
@@ -92,6 +93,51 @@ test('admin rejects invalid status before writing', async () => {
     const res = makeRes();
     await handler({ method: 'PATCH', headers: { 'content-type': 'application/json', authorization: 'Bearer token' }, body: { id: '123e4567-e89b-12d3-a456-426614174000', status: 'deleted' } }, res);
     assert.equal(res.code, 400); assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const key of vars) { if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key]; }
+  }
+});
+
+test('comma-separated ADMIN_EMAIL lets every configured admin sign in', async () => {
+  const vars = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ADMIN_EMAIL'];
+  const old = Object.fromEntries(vars.map(k => [k, process.env[k]]));
+  Object.assign(process.env, { SUPABASE_URL: 'https://db.example', SUPABASE_ANON_KEY: 'public', SUPABASE_SERVICE_ROLE_KEY: 'secret', ADMIN_EMAIL: ' first@example.com, second@example.com ,' });
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const email of ['first@example.com', 'SECOND@example.com']) {
+      globalThis.fetch = async url => url.endsWith('/auth/v1/user')
+        ? { ok: true, json: async () => ({ email, email_confirmed_at: '2026-01-01' }) }
+        : { ok: true, json: async () => [] };
+      const res = makeRes(); await handler({ method: 'GET', headers: { authorization: 'Bearer token' } }, res);
+      assert.equal(res.code, 200, `${email} should be allowed`);
+    }
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; return { ok: true, json: async () => ({ email: 'other@example.com', email_confirmed_at: '2026-01-01' }) }; };
+    const res = makeRes(); await handler({ method: 'GET', headers: { authorization: 'Bearer token' } }, res);
+    assert.equal(res.code, 403); assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const key of vars) { if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key]; }
+  }
+});
+
+test('comma-separated ADMIN_EMAIL also protects the lead sources API', async () => {
+  const vars = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'ADMIN_EMAIL'];
+  const old = Object.fromEntries(vars.map(k => [k, process.env[k]]));
+  Object.assign(process.env, { SUPABASE_URL: 'https://db.example', SUPABASE_ANON_KEY: 'public', SUPABASE_SERVICE_ROLE_KEY: 'secret', ADMIN_EMAIL: 'first@example.com,second@example.com' });
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const email of ['first@example.com', 'second@example.com']) {
+      globalThis.fetch = async url => url.endsWith('/auth/v1/user')
+        ? { ok: true, json: async () => ({ email, email_confirmed_at: '2026-01-01' }) }
+        : { ok: true, json: async () => [] };
+      const res = makeRes(); await sourcesHandler({ method: 'GET', headers: { authorization: 'Bearer token' } }, res);
+      assert.equal(res.code, 200, `${email} should be allowed`);
+    }
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ email: 'other@example.com', email_confirmed_at: '2026-01-01' }) });
+    const res = makeRes(); await sourcesHandler({ method: 'GET', headers: { authorization: 'Bearer token' } }, res);
+    assert.equal(res.code, 403);
   } finally {
     globalThis.fetch = originalFetch;
     for (const key of vars) { if (old[key] === undefined) delete process.env[key]; else process.env[key] = old[key]; }
