@@ -15,7 +15,7 @@ Vercel can build the site with `npm run build` and serve the `dist` directory. C
 
 Service, creator, business and free-resource forms are saved in a private Supabase table and forwarded to both configured inboxes through FormSubmit. The administrator can sign in at `/admin/` to review entries, update follow-up status, delete test or obsolete records, compare opted-in creator profiles with opted-in business requests, and prepare an unsent introduction email draft. The admin reviews every match and sends any introduction manually. See `/privacy.html` for the data notice and `docs/end-to-end-test.md` for a complete test walkthrough.
 
-Two practical starter guides are available after the free-resource form is submitted. The contact-directory details remain placeholders until the business provides them.
+Two practical starter guides download automatically as PDFs after the free-resource form is submitted; the HTML versions remain available online. The PDFs are generated from the guide pages with `scripts/generate-resource-pdfs.py`. Public contact cards show phone and social links, not email addresses.
 
 Original source notes and logo files are excluded from Git. Optimized logo assets used by the site are included in `assets/`.
 ## Lead workspace
