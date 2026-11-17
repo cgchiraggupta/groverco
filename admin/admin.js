@@ -4,12 +4,34 @@ import { matchCreators } from '../lib/matching.js';
 const login = document.querySelector('#login-view');
 const dashboard = document.querySelector('#dashboard');
 const loginStatus = document.querySelector('#login-status');
+const loginTitle = document.querySelector('#login-title');
+const loginIntro = document.querySelector('#login-intro');
+const loginForm = document.querySelector('#login-form');
+const passwordForm = document.querySelector('#password-form');
+const passwordStatus = document.querySelector('#password-status');
+const forgotPassword = document.querySelector('#forgot-password');
 const status = document.querySelector('#dashboard-status');
 const signOut = document.querySelector('#sign-out');
 const submissionsNode = document.querySelector('#submissions');
 const sourceList = document.querySelector('#source-list');
 let client, submissions = [], sources = [], includeArchived = false;
 const activeSubmissions = () => submissions.filter(item => !item.archived_at);
+
+function recoveryType() {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(location.search);
+  const type = hash.get('type') || query.get('type');
+  return ['invite', 'recovery'].includes(type) ? type : null;
+}
+
+function showPasswordForm(type) {
+  loginForm.hidden = true;
+  forgotPassword.hidden = true;
+  passwordForm.hidden = false;
+  loginTitle.textContent = type === 'invite' ? 'Finish setting up.' : 'Choose a new password.';
+  loginIntro.textContent = 'Use at least 8 characters. You will use this password to sign in next time.';
+  loginStatus.textContent = '';
+}
 
 function prepareIntroduction(business, creator) {
   const bd = business.details || {}, cd = creator.details || {};
@@ -216,12 +238,15 @@ async function load(session) {
 }
 
 async function initialize() {
+  const recovery = recoveryType();
+  if (recovery) showPasswordForm(recovery);
   try {
     const response = await fetch('/api/admin-config', { cache: 'no-store' });
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Admin access is not configured yet.');
     const config = await response.json();
     client = createClient(config.url, config.key, { auth: { storage: window.sessionStorage, autoRefreshToken: true } });
-    const { data: { session } } = await client.auth.getSession(); if (session) await load(session);
+    const { data: { session } } = await client.auth.getSession();
+    if (session && !recovery) await load(session);
   } catch (error) { loginStatus.textContent = error.message; }
 }
 
@@ -233,6 +258,36 @@ document.querySelector('#login-form').addEventListener('submit', async event => 
   document.querySelector('#password').value = '';
   if (error) { loginStatus.textContent = 'Unable to sign in. Check your credentials and try again.'; return; }
   try { await load(data.session); loginStatus.textContent = ''; } catch (err) { await client.auth.signOut(); loginStatus.textContent = err.message; }
+});
+passwordForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!client) { passwordStatus.textContent = 'Admin access is not configured yet.'; return; }
+  const next = document.querySelector('#new-password').value;
+  const confirm = document.querySelector('#confirm-password').value;
+  if (next.length < 8) { passwordStatus.textContent = 'Use at least 8 characters.'; return; }
+  if (next !== confirm) { passwordStatus.textContent = 'The two passwords do not match.'; return; }
+  const button = passwordForm.querySelector('[type="submit"]'); button.disabled = true;
+  passwordStatus.textContent = 'Saving your password…';
+  const { error } = await client.auth.updateUser({ password: next });
+  if (error) { passwordStatus.textContent = error.message; button.disabled = false; return; }
+  history.replaceState(null, '', location.pathname);
+  const { data: { session } } = await client.auth.getSession();
+  if (session) {
+    try { await load(session); }
+    catch (err) { passwordStatus.textContent = err.message; button.disabled = false; }
+  } else {
+    loginForm.hidden = false; forgotPassword.hidden = false; passwordForm.hidden = true;
+    loginTitle.textContent = 'Welcome back.'; loginIntro.textContent = 'Sign in to manage leads, sources and follow-up.';
+    loginStatus.textContent = 'Password set. Sign in to continue.';
+  }
+});
+forgotPassword.addEventListener('click', async () => {
+  if (!client) { loginStatus.textContent = 'Admin access is not configured yet.'; return; }
+  const email = document.querySelector('#email').value.trim();
+  if (!email) { loginStatus.textContent = 'Enter your email address first.'; document.querySelector('#email').focus(); return; }
+  loginStatus.textContent = 'Sending a reset link…';
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/admin/` });
+  loginStatus.textContent = error ? error.message : 'Password reset link sent. Check your inbox.';
 });
 signOut.addEventListener('click', async () => { await client.auth.signOut(); submissions = []; sources = []; submissionsNode.replaceChildren(); dashboard.hidden = true; signOut.hidden = true; login.hidden = false; });
 document.querySelector('#refresh').addEventListener('click', async () => { try { await load(await currentSession()); status.textContent = `Loaded ${submissions.length} leads and ${sources.length} sources.`; } catch (error) { status.textContent = error.message; } });
