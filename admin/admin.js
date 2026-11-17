@@ -102,7 +102,7 @@ function renderSources() {
     row.append(nameLabel, activeLabel, save);
     row.addEventListener('submit', async event => {
       event.preventDefault(); save.disabled = true;
-      try { const session = await currentSession(); const result = await adminRequest(session, '/api/admin-sources', 'PATCH', { id: source.id, label: input.value, is_active: active.checked }); Object.assign(source, result.source); status.textContent = `Source “${source.label}” updated.`; renderSources(); render(); }
+      try { const session = await currentSession(); const result = await adminRequest(session, '/api/admin-sources', 'PATCH', { id: source.id, label: input.value, is_active: active.checked }); Object.assign(source, result.source); renderSources(); render(); status.textContent = `Source “${source.label}” updated.`; }
       catch (error) { status.textContent = error.message; save.disabled = false; }
     });
     sourceList.append(row);
@@ -112,6 +112,19 @@ function renderSources() {
 function addControlLabel(parent, text, control) {
   const label = document.createElement('label'); label.className = 'lead-field';
   const caption = document.createElement('span'); caption.textContent = text; label.append(caption, control); parent.append(label); return label;
+}
+
+function deleteLeadButton(item) {
+  const remove = document.createElement('button');
+  remove.className = 'admin-link delete-action';
+  remove.type = 'button'; remove.textContent = 'Delete lead';
+  remove.addEventListener('click', async () => {
+    if (!confirm(`Permanently delete ${item.name}? This cannot be undone.`)) return;
+    remove.disabled = true;
+    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'DELETE', { id: item.id }); await load(session); status.textContent = `Lead deleted for ${item.name}.`; }
+    catch (error) { status.textContent = error.message; remove.disabled = false; }
+  });
+  return remove;
 }
 
 function renderSubmission(item) {
@@ -146,24 +159,24 @@ function renderSubmission(item) {
   const archive = document.createElement('button'); archive.className = `admin-link${archived ? '' : ' archive-action'}`; archive.type = 'button'; archive.textContent = archived ? 'Restore lead' : 'Archive lead';
   archive.addEventListener('click', async () => {
     archive.disabled = true;
-    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, ...(archived ? { restore: true } : { archive: true }) }); status.textContent = archived ? `Lead restored for ${item.name}.` : `Lead archived for ${item.name}.`; await load(session); }
+    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, ...(archived ? { restore: true } : { archive: true }) }); await load(session); status.textContent = archived ? `Lead restored for ${item.name}.` : `Lead archived for ${item.name}.`; }
     catch (error) { status.textContent = error.message; archive.disabled = false; }
   });
-  if (archived) { actions.append(archive); card.append(meta, title, chips, dl, actions); return card; }
+  if (archived) { actions.append(archive, deleteLeadButton(item)); card.append(meta, title, chips, dl, actions); return card; }
   const save = document.createElement('button'); save.className = 'admin-link'; save.type = 'button'; save.textContent = 'Save lead details';
   save.addEventListener('click', async () => {
     save.disabled = true;
-    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, source: sourceSelect.value, marker: markerSelect.value, follow_up_at: followUp.value || null, status: state.value, notes: notes.value }); Object.assign(item, { source: sourceSelect.value, marker: markerSelect.value, follow_up_at: followUp.value || null, status: state.value, notes: notes.value }); status.textContent = `Lead details saved for ${item.name}.`; render(); }
+    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, source: sourceSelect.value, marker: markerSelect.value, follow_up_at: followUp.value || null, status: state.value, notes: notes.value }); Object.assign(item, { source: sourceSelect.value, marker: markerSelect.value, follow_up_at: followUp.value || null, status: state.value, notes: notes.value }); render(); status.textContent = `Lead details saved for ${item.name}.`; }
     catch (error) { status.textContent = error.message; save.disabled = false; }
   });
-  const contacted = document.createElement('button'); contacted.className = 'admin-link contact-action'; contacted.type = 'button'; contacted.textContent = `Mark contacted · ${Number(item.contact_count || 0)} attempts`;
+  const contacted = document.createElement('button'); contacted.className = 'admin-link contact-action'; contacted.type = 'button'; const contactCount = Number(item.contact_count || 0); contacted.textContent = `Mark contacted · ${contactCount} ${contactCount === 1 ? 'attempt' : 'attempts'}`;
   contacted.addEventListener('click', async () => {
     contacted.disabled = true;
-    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, mark_contacted: true }); item.contact_count = Number(item.contact_count || 0) + 1; item.last_contacted_at = new Date().toISOString(); item.status = 'contacted'; status.textContent = `Contact attempt recorded for ${item.name}.`; render(); }
+    try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'PATCH', { id: item.id, mark_contacted: true }); item.contact_count = Number(item.contact_count || 0) + 1; item.last_contacted_at = new Date().toISOString(); item.status = 'contacted'; render(); status.textContent = `Contact attempt recorded for ${item.name}.`; }
     catch (error) { status.textContent = error.message; contacted.disabled = false; }
   });
   const last = document.createElement('p'); last.className = 'last-contacted'; last.textContent = item.last_contacted_at ? `Last contacted ${new Date(item.last_contacted_at).toLocaleString()}` : 'No contact attempt recorded yet';
-  actions.append(save, contacted, archive, last); card.append(meta, title, chips, dl, controls, actions); return card;
+  actions.append(save, contacted, archive, deleteLeadButton(item), last); card.append(meta, title, chips, dl, controls, actions); return card;
 }
 
 function render() {
@@ -225,7 +238,7 @@ document.querySelector('#include-archived').addEventListener('change', async eve
 document.querySelector('#source-form').addEventListener('submit', async event => {
   event.preventDefault(); const input = document.querySelector('#new-source-label'), label = input.value.trim(); if (!label) return;
   const button = event.currentTarget.querySelector('button'); button.disabled = true;
-  try { const session = await currentSession(); const result = await adminRequest(session, '/api/admin-sources', 'POST', { label }); sources.push(result.source); input.value = ''; status.textContent = `Source “${label}” added. It is now available in new forms.`; render(); }
+  try { const session = await currentSession(); const result = await adminRequest(session, '/api/admin-sources', 'POST', { label }); sources.push(result.source); input.value = ''; render(); status.textContent = `Source “${label}” added. It is now available in new forms.`; }
   catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 });
