@@ -118,11 +118,16 @@ function deleteLeadButton(item) {
   const remove = document.createElement('button');
   remove.className = 'admin-link delete-action';
   remove.type = 'button'; remove.textContent = 'Delete lead';
+  let armed = false, resetTimer;
   remove.addEventListener('click', async () => {
-    if (!confirm(`Permanently delete ${item.name}? This cannot be undone.`)) return;
-    remove.disabled = true;
+    if (!armed) {
+      armed = true; remove.textContent = 'Click again to delete';
+      resetTimer = setTimeout(() => { armed = false; remove.textContent = 'Delete lead'; }, 5000);
+      return;
+    }
+    clearTimeout(resetTimer); armed = false; remove.disabled = true;
     try { const session = await currentSession(); await adminRequest(session, '/api/admin-submissions', 'DELETE', { id: item.id }); await load(session); status.textContent = `Lead deleted for ${item.name}.`; }
-    catch (error) { status.textContent = error.message; remove.disabled = false; }
+    catch (error) { status.textContent = error.message; remove.textContent = 'Delete lead'; remove.disabled = false; }
   });
   return remove;
 }
